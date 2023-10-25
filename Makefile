@@ -8,7 +8,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=node
-PKG_VERSION:=$(shell curl -s https://downloads.openwrt.org/releases/packages-23.05/aarch64_generic/packages/ | grep node_v | grep -oP 'node_v\d+\.\d+\.\d+-\d+' | sed -n 's/node_//p' | head -n1)
+PKG_BASE:=$(shell curl -s https://downloads.openwrt.org/releases/ | grep packages- | tail -n1 | grep -o '<a[^>]*>[^<]*</a>' | sed 's/<[^>]*>//g')
+PKG_VERSION:=$(shell curl -s https://downloads.openwrt.org/releases/$(PKG_BASE)/aarch64_generic/packages/ | grep node_v | grep -oP 'node_v\d+\.\d+\.\d+-\d+' | sed -n 's/node_//p' | head -n1)
 
 PKG_MAINTAINER:=Hirokazu MORIKAWA <morikw2@gmail.com>, Adrian Panella <ianchi74@outlook.com>
 PKG_LICENSE:=MIT
@@ -58,9 +59,14 @@ endef
 define Build/Compile
 	( \
 		pushd $(PKG_BUILD_DIR) ; \
-		wget -O node.ipk https://downloads.openwrt.org/releases/packages-23.05/$(ARCH_PACKAGES)/packages/node_$(PKG_VERSION)_$(ARCH_PACKAGES).ipk ; \
-		$(TAR) -zxvf node.ipk ; \
+		wget https://downloads.openwrt.org/releases/$(PKG_BASE)/$(ARCH_PACKAGES)/packages/node_$(PKG_VERSION)_$(ARCH_PACKAGES).ipk ; \
+		$(TAR) -zxf node_$(PKG_VERSION)_$(ARCH_PACKAGES).ipk ; \
+		$(TAR) -zxf data.tar.gz ; \
+		rm -f data.tar.gz control.tar.gz debian-binary ; \
+		wget https://downloads.openwrt.org/releases/$(PKG_BASE)/$(ARCH_PACKAGES)/packages/node-npm_$(PKG_VERSION)_$(ARCH_PACKAGES).ipk ; \
+		$(TAR) -zxvf node-npm_$(PKG_VERSION)_$(ARCH_PACKAGES).ipk ; \
 		$(TAR) -zxvf data.tar.gz ; \
+		rm -f data.tar.gz control.tar.gz debian-binary ; \
 		popd ; \
 	)
 endef
@@ -68,6 +74,19 @@ endef
 define Package/node/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/usr/bin/node $(1)/usr/bin/
+endef
+
+define Package/node-npm/install
+	$(INSTALL_DIR) $(1)/usr/lib/node_modules/npm
+	$(CP) $(PKG_BUILD_DIR)/usr/lib/node_modules/npm/{package.json,LICENSE} \
+		$(1)/usr/lib/node_modules/npm/
+	$(CP) $(PKG_BUILD_DIR)/usr/lib/node_modules/npm/README.md \
+		$(1)/usr/lib/node_modules/npm/
+	$(CP) $(PKG_BUILD_DIR)/usr/lib/node_modules/npm/{node_modules,bin,lib} \
+		$(1)/usr/lib/node_modules/npm/
+	$(INSTALL_DIR) $(1)/usr/bin
+	$(LN) ../lib/node_modules/npm/bin/npm-cli.js $(1)/usr/bin/npm
+	$(LN) ../lib/node_modules/npm/bin/npx-cli.js $(1)/usr/bin/npx
 endef
 
 $(eval $(call HostBuild))
