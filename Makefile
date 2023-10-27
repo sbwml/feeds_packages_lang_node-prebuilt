@@ -10,6 +10,7 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=node
 PKG_BASE:=$(shell curl -s https://downloads.openwrt.org/releases/ | grep packages- | tail -n1 | grep -o '<a[^>]*>[^<]*</a>' | sed 's/<[^>]*>//g')
 PKG_VERSION:=$(shell curl -s https://downloads.openwrt.org/releases/$(PKG_BASE)/aarch64_generic/packages/ | grep node_v | grep -oP 'node_v\d+\.\d+\.\d+-\d+' | sed -n 's/node_//p' | head -n1)
+NODE_VERSION:=$(shell echo $(PKG_VERSION) | sed 's/-.*//')
 
 PKG_MAINTAINER:=Hirokazu MORIKAWA <morikw2@gmail.com>, Adrian Panella <ianchi74@outlook.com>
 PKG_LICENSE:=MIT
@@ -56,6 +57,24 @@ define Package/node-npm/description
 	NPM is the package manager for NodeJS
 endef
 
+ifeq ($(HOST_ARCH),x86_64)
+	NODE_ARCH:=x64
+endif
+
+ifeq ($(HOST_ARCH),aarch64)
+	NODE_ARCH:=arm64
+endif
+
+define Host/Compile
+	( \
+		pushd $(HOST_BUILD_DIR) ; \
+		$(RM) node-v* ; \
+		wget https://nodejs.org/dist/$(NODE_VERSION)/node-$(NODE_VERSION)-linux-$(NODE_ARCH).tar.xz ; \
+		$(TAR) -xf node-$(NODE_VERSION)-linux-$(NODE_ARCH).tar.xz ; \
+		popd ; \
+	)
+endef
+
 define Build/Compile
 	( \
 		pushd $(PKG_BUILD_DIR) ; \
@@ -64,8 +83,8 @@ define Build/Compile
 		$(TAR) -zxf data.tar.gz ; \
 		rm -f data.tar.gz control.tar.gz debian-binary ; \
 		wget https://downloads.openwrt.org/releases/$(PKG_BASE)/$(ARCH_PACKAGES)/packages/node-npm_$(PKG_VERSION)_$(ARCH_PACKAGES).ipk ; \
-		$(TAR) -zxvf node-npm_$(PKG_VERSION)_$(ARCH_PACKAGES).ipk ; \
-		$(TAR) -zxvf data.tar.gz ; \
+		$(TAR) -zxf node-npm_$(PKG_VERSION)_$(ARCH_PACKAGES).ipk ; \
+		$(TAR) -zxf data.tar.gz ; \
 		rm -f data.tar.gz control.tar.gz debian-binary ; \
 		popd ; \
 	)
@@ -87,6 +106,10 @@ define Package/node-npm/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(LN) ../lib/node_modules/npm/bin/npm-cli.js $(1)/usr/bin/npm
 	$(LN) ../lib/node_modules/npm/bin/npx-cli.js $(1)/usr/bin/npx
+endef
+
+define Host/Install
+	$(CP) $(PKG_BUILD_DIR)/node-$(NODE_VERSION)-linux-$(NODE_ARCH)/* $(STAGING_DIR_HOST)/
 endef
 
 $(eval $(call HostBuild))
