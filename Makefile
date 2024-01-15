@@ -109,7 +109,7 @@ define Package/node-npm/install
 endef
 
 define Host/Install
-	$(CP) $(PKG_BUILD_DIR)/node-$(NODE_VERSION)-linux-$(NODE_ARCH)/* $(STAGING_DIR_HOST)/
+	$(CP) $(HOST_BUILD_DIR)/node-$(NODE_VERSION)-linux-$(NODE_ARCH)/* $(STAGING_DIR_HOST)/
 endef
 
 $(eval $(call HostBuild))
